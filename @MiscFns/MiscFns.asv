@@ -1,5 +1,5 @@
 classdef MiscFns
-    % A scoped class to hold miscellaneous functions
+    % A scoped class to hold miscellaneous functions and values
     
     properties (Static = true)
         tab = char(9);
@@ -31,10 +31,12 @@ classdef MiscFns
                 if isstruct(file_data)
                     % Even if header lines are not asked for, importdata return
                     % a struct with headers if a line of strings is found
-                    out = filedata;
+                    file_data.colheaders = {};
+                    file_data.textdata = {};
+                    out = file_data;
                 else
                     % importdata does not return a struct if the file
-                    % contains just numbers and you do not specif
+                    % contains just numbers and you do not specify headers
                     out = MiscFns.csv_struct(file_data, {});
                 end
             end
@@ -96,11 +98,31 @@ classdef MiscFns
             end
         end
         
+        function [out] = get_files(directory_str, regex_format)
+            % Returns all files in given directory that match the regular
+            % expression
+            out = {};
+            file_info = dir();
+            for index = 1:length(file_info)
+                filename = file_info(index).name;
+                if MiscFns.is_match(filename, regex_format)
+                    out = {out file_info(index).name
+                end
+            end
+        end
+        
+        function [out] = is_match(test_str, regex_format)
+            % Wrapper around regexp to return a TRUE or FALSE (0 or 1) if
+            % the regular expression matches at all
+            if isempty(regexp(test_str, regex_format, 'once'))
+                out = 0;
+            else
+                out = 1;
+            end
+        end
+        
+        
+        
     end
-
-
-    
-    
-    
     
 end

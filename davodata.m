@@ -25,7 +25,7 @@ for index = 1:length(file_info)
         y_col_header = y_col_header{1};
         y_col_header = y_col_header{1};
         y_col_header = regexprep(y_col_header, 'p', '.');
-        colheaders = {x_col_header y_col_header 'StdevY'};
+        colheaders = {x_col_header y_col_header 'StdevY' 'dYbydX'};
         file = MiscFns.import_csv(file_info(index).name, delimiter, header_line);
         
         % DO SOMETHING TO EACH FILE HERE
@@ -74,6 +74,11 @@ for index = 1:length(file_info)
             output(counter,:) = [avg_x avg_y err_y];
             counter = counter + 1;
         end
+        
+        % Calculate the derivative dy/dx
+        dy_by_dx = diff(output(:,2))./bin_size;
+        output = output(1:end-1,:); % Snip the last row off since derivative has n-1 values
+        output = [output dy_by_dx];
         
         % Output file with a .avg suffix
         out_file = [filename output_extension];

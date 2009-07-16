@@ -98,6 +98,31 @@ classdef MiscFns
             end
         end
         
+        function [out] = get_files(directory_str, regex_format)
+            % Returns all cell array of file strings in given directory that match the regular
+            % expression
+            out = {};
+            file_info = dir(directory_str);
+            for index = 1:length(file_info)
+                filename = file_info(index).name;
+                if MiscFns.regex_match(filename, regex_format)
+                    out = [out filename];
+                end
+            end
+        end
+        
+        function [out] = regex_match(test_str, regex_format)
+            % Wrapper around regexp to return a TRUE or FALSE (0 or 1) if
+            % the regular expression matches at all
+            if isempty(regexp(test_str, regex_format, 'once'))
+                out = 0;
+            else
+                out = 1;
+            end
+        end
+        
+        
+        
     end
     
 end
