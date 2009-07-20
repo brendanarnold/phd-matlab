@@ -63,7 +63,17 @@ classdef MiscFns
             for row_index = 1:rows
                 file_line = '';
                 for col_index = 1:cols
-                    str_val = num2str(data.data(row_index, col_index));
+                    val = data.data(row_index, col_index);
+                    if isnumeric(val) % Convert numeric to string
+                        str_val = num2str(val);
+                    elseif iscell(val) % Convert cell to string
+                        while iscell(val) % Why do I need to do this?
+                            val = val{1};
+                        end
+                        str_val = val; 
+                    else % Assume all else is string (not true I know)
+                        str_val = val;
+                    end
                     if col_index == 1
                         file_line = str_val;
                     else
@@ -111,16 +121,46 @@ classdef MiscFns
             end
         end
         
-        function [out] = regex_match(test_str, regex_format)
-            % Wrapper around regexp to return a TRUE or FALSE (0 or 1) if
-            % the regular expression matches at all
-            if isempty(regexp(test_str, regex_format, 'once'))
-                out = 0;
-            else
-                out = 1;
-            end
-        end
-        
+%         function [out] = regex_match(test_str, regex_format)
+%             % Wrapper around regexp to return a TRUE or FALSE (0 or 1) if
+%             % the regular expression matches at all
+%             if isempty(regexp(test_str, regex_format, 'once'))
+%                 out = 0;
+%             else
+%                 out = 1;
+%             end
+%         end
+%         
+%         %function serialize_structs(struct_array, out_filename)
+%         %    MiscFns.serialize_structs(struct_array, 'root', 'datafile', out_filename);
+%         %end
+%         
+%         function serialize_structs(struct_array, root_element_name, struct_element_name, out_filename)
+%             % Serializes an array of structs into an xml document
+%             % This is useful for creating a configuration file
+%             % Caveats:
+%             %  Can only deal with fields containing strings
+%             %  Can only serialise structs one level deep
+%             document_handle = com.mathworks.xml.XMLUtils.createDocument(root_element_name);
+%             root_node = document_handle.getDocumentElement;
+%             for index = 1:length(struct_array)
+%                 struct_element = document_handle.createElement(struct_element_name);
+%                 for field_name = fieldnames(struct_array(index))'
+%                     field_name = field_name{1};
+%                     field_str = getfield(struct_array(index), field_name);
+%                     field_element = document_handle.createElement(field_name);
+%                     field_element.appendChild(document_handle.createTextNode(field_str));
+%                     struct_element.appendChild(field_element);
+%                 end
+%                 root_node.appendChild(struct_element);
+%             end
+%             xmlwrite(out_filename, document_handle);
+%         end
+%         
+%         function [out] = unserialize_structs(filename)
+%             document_handle = xmlread(filename);
+%             document_handle.
+%         end
         
         
     end
