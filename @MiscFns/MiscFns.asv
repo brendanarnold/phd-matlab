@@ -63,8 +63,17 @@ classdef MiscFns
             for row_index = 1:rows
                 file_line = '';
                 for col_index = 1:cols
-                    val = 
-                    str_val = num2str(data.data(row_index, col_index));
+                    val = data.data(row_index, col_index);
+                    if isnumeric(val) % Convert numeric to string
+                        str_val = num2str(val);
+                    elseif iscell(val) % Convert cell to string
+                        while iscell(val) % Why do I need to do this?
+                            val = val{1};
+                        end
+                        str_val = val; 
+                    else % Assume all else is string (not true I know)
+                        str_val = val;
+                    end
                     if col_index == 1
                         file_line = str_val;
                     else
@@ -153,6 +162,9 @@ classdef MiscFns
 %             document_handle.
 %         end
         
+        function [out] = extract_color(index, total)
+            % Extract closest color from 'colormap' global variable given
+        end
         
     end
     

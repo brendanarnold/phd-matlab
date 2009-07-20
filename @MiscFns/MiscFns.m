@@ -162,6 +162,21 @@ classdef MiscFns
 %             document_handle.
 %         end
         
+        function [out] = extract_color(frctn, cmap)
+            % Extract closest color from default colormap or given colormap given
+            % a floating point number between 0 and 1.
+            if ~exist('cmap', 'var') || ~isnumeric(cmap) || ~isempty(cmap) 
+                cmap = colormap();
+            end
+            index = ceil(frctn * size(cmap, 1)); % Ceil because matlab is not zero indexed
+            if index == 0
+                out = cmap(1,:);
+            else
+                out = cmap(index,:);
+            end
+        end
+        
+        
         
     end
     
