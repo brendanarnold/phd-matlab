@@ -36,7 +36,6 @@ function davodata()
 
             max_x = max(file.data(:, x_col));
             min_x = min(file.data(:, x_col));
-            [num_points, num_cols] = size(file.data);
             num_bins = floor((max_x - min_x)/bin_size) + 1;
             % Initialise some matrices for performance
             bins = zeros(num_bins, 4);
