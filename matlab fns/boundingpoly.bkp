@@ -1,0 +1,100 @@
+function plist=boundingpoly(kp,kbs,incl_point);
+%function boundingpoly(kp,kb)
+%
+%returns nx3 matrix of points in 3d space that are the vertices of the polygon formed by the
+%intersection of planes kb with plane kp
+
+%find coords of points in plane
+%first calc r0's and d's of bounding lines i.e. intersection of kbs with kp (see p55 lab book III)
+d=nan(size(kbs,1),3); r0=nan(size(kbs,1),3);
+vdebug=false;
+if abs(kp(1)+0.2990)<0.01
+    vdebug=true;
+end
+for planenum=1:size(kbs,1)
+    kb=kbs(planenum,:);
+    d(planenum,:)=cross(kp,kb);
+    d(planenum,:)=d(planenum,:)/(norm(kp)*norm(kb));
+    if abs((norm(kp)-norm(kb))/norm(d(planenum,:)))>(2*max(abs(kbs)))
+        %detects distant intersections of almost parallel planes
+        d(planenum,:)=nan;
+        r0(planenum,:)=nan;
+        continue;
+    end
+    r0(planenum,:)=(dot(kb,kb)*(dot(kp,kb)-dot(kp,kp))*kp+dot(kp,kp)*(dot(kb,kp)-dot(kb,kb))*kb);
+    denom=(dot(kb,kp)^2-dot(kb,kb)*dot(kp,kp));
+    if abs(denom)>=1e-30
+        r0(planenum,:)=r0(planenum,:)/denom;
+    else
+        r0(planenum,:)=sign(r0(planenum,:))*sign(denom)*Inf;
+    end
+end
+%now find intersection points of all pairs of lines
+p=nan(size(kbs,1),size(kbs,1),3);
+for planenum1=1:size(r0,1)
+    q=cross(kp,d(planenum1,:))/(norm(kp)*norm(d(planenum1,:)));
+    for planenum2=planenum1+1:size(r0,1)
+        lamda2=dot(r0(planenum1,:)-r0(planenum2,:),q);
+        denom=dot(d(planenum2,:),q);
+        if abs(denom)>=sqrt(realmin)
+            lamda2=lamda2/denom;
+        else
+            lamda2=sign(lamda2)*sign(denom)*Inf;
+        end
+        p(planenum1,planenum2,:)=r0(planenum2,:)+lamda2*d(planenum2,:);
+    end
+end
+if vdebug==true
+    tempplotlines(r0,d,p,kp);
+end
+%eliminate intersections that are not vertices of bounding polygon
+plist=reshape(p,numel(p)/3,3);
+validpts=find(~any(isnan(plist) | isinf(plist),2));
+outside=isoutside(kbs,incl_point,plist(validpts,:),1e-4);
+plist(validpts(outside~=0),:)=nan;
+p=reshape(plist,size(kbs,1),size(kbs,1),3);
+
+%for planenum1=1:size(r0,1)
+%    for planenum2=planenum1+1:size(r0,1)
+%        thisp=permute(p(planenum1,planenum2,:),[1 3 2]);
+%        for planenum3=1:size(r0,1)
+%            if (planenum3==planenum1) | (planenum3==planenum2)
+%                continue;
+%            else
+%                %calc intersection of line (incl point)->thisp with line that is intersection of
+%                %kp plane with kbs(planenum3) plane
+%                intersectdist=dot(r0(planenum3,:)-incl_point,kbs(planenum3,:));
+%                denom=dot(thisp-incl_point,kbs(planenum3,:));
+%                if abs(denom)>=realmin
+%                    intersectdist=intersectdist/denom;
+%                else
+%                    intersectdist=sign(intersectdist)*sign(denom)*Inf;
+%                end
+%                if intersectdist<=1 & intersectdist>0
+%                    p(planenum1,planenum2,:)=NaN;
+%                    break;
+%                end
+%            end
+%        end
+%    end
+%end
+
+
+%make list of bounding pts in correct order to define polygon
+%rs and cs are row, col coords of valid bounding points in matrix of line
+%intersections p. Need to find order n such that for each change n->n+1
+%only one of r or c changes
+[rs cs]=find(~(all(p==0,3) | any(isnan(p) | isinf(p),3)));
+n(1)=1;
+for pnum=2:length(rs)
+    %tn is pair of points that share one line with current point
+    tn=setdiff(find(rs==rs(n(pnum-1)) | cs==rs(n(pnum-1)) | cs==cs(n(pnum-1)) | rs==cs(n(pnum-1))),n);
+    if numel(tn)==0
+        vdebug=true;
+    end
+    n(pnum)=tn(1);        
+end
+clear plist;
+for pnum=1:length(rs)
+    plist(pnum,:)=p(rs(n(pnum)),cs(n(pnum)),:);
+end

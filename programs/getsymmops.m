@@ -1,0 +1,65 @@
+function [symmops rec_latt_vecs n_rec_latt_vecs cuboid]=getsymmops(filename);
+%function [symmops rec_latt_vecs n_rec_latt_vecs cuboid]=getsymmops(filename);
+%
+%rec_latt_vecs is [ax ay az; bx by bz; cx cy cz]
+
+disp('Reading symm operations, rec latt vecs from .outputkgen');
+load 'constants.mat';
+infile=fopen(filename,'r');
+numheaderlines=11;
+for linenum=1:numheaderlines
+    linestr=fgetl(infile);
+end
+if ~strcmp(linestr(5:26),'SYMMETRY MATRIX NR.  1')
+    disp('.outputkgen not expected format');
+end
+notatend=true;
+matgroupnum=1;
+while notatend
+    row=zeros(3,12);
+    for rownum=1:3
+        rowstr{rownum}=fgetl(infile);
+        row(rownum,:)=sscanf(rowstr{rownum},'%f',12);
+    end
+    for colnum=1:4
+        symmops(:,:,(matgroupnum-1)*4+colnum)=[row(1,(colnum-1)*3+(1:3)); row(2,(colnum-1)*3+(1:3)); row(3,(colnum-1)*3+(1:3))];
+    end
+    linestr=fgetl(infile);
+    if ~strcmp(linestr(5:19),'SYMMETRY MATRIX')
+        notatend=false;
+    else
+        matgroupnum=matgroupnum+1;
+    end    
+end
+%filter out symmop matrices that have zero determinant
+for opnum=1:size(symmops,3)
+    zerodet(opnum)=det(symmops(:,:,opnum))==0;
+end
+if any(zerodet)
+    disp(['Symm op matrices ' num2str(find(zerodet)) ' with det=0 discarded.']);
+end
+symmops=symmops(:,:,~zerodet);
+
+%make identity op first op
+identityop=find(all(all(repmat(eye(3),[1 1 size(symmops,3)])==symmops,1),2));
+temp=symmops(:,:,1);
+symmops(:,:,1)=symmops(:,:,identityop);
+symmops(:,:,identityop)=temp;
+
+%rec latt vecs immediately follow
+if ~strcmp(linestr(5:26),'G1        G2        G3')
+    disp('Can''t find rec latt vecs');
+    return;
+end
+
+for vecnum=1:3
+    linestr=fgetl(infile);
+    %note vecs are in cols not rows
+    rec_latt_vecs(:,vecnum)=2*pi/Bohr_radius*sscanf(linestr,'%f%f%f'); %result is in Angstrom^-1
+end
+
+denom=max(abs(rec_latt_vecs),[],1);
+n_rec_latt_vecs=rec_latt_vecs./repmat(denom,3,1);
+
+%find the largest values of x,y,z that occur in the rl unit cell
+cuboid=max(combs(0:1,0:1,0:1)*n_rec_latt_vecs);

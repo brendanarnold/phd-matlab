@@ -1,0 +1,11 @@
+function amp=nehint;
+
+integ_tol=1e-6;
+
+oscs(n)=quad(@integrand,0,2,integ_tol);
+
+    function integrand_val=integrand(x);
+    
+        integrand_val=kf*vf*tau;
+    end
+end

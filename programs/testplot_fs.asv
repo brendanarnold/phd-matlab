@@ -1,0 +1,133 @@
+function [haxes,hFSpatches]=plot_FS(filenameORvar,bands,bandcolours,bplane_normals,incl_point,centrek,undersample_factor,haxes,clipintersectedfaces);
+%function [haxes,hFSpatches]=plot_FS(filenameORvar,bands,bandcolours,bplane_normals,incl_point,centrek,undersample_factor,haxes,clipintersectedfaces);
+%
+%plots Fermi surface arising from 'bands' in the region 
+%including incl_point that is bounded by bplane_normals (which are
+%expressed in cartesian coords). by default, plots first BZ zone
+
+%arguments
+%   filenameorvar:          structure containing bandstructure info as output by convert_W2kE;
+%   bands:                  numbers of bands to plot (empty means all)
+%   bplane_normals:         normal vectors of planes bounding the volume to be plotted (Cart coords)
+%   incl_point:             a point inside the volume to be plotted (Cart coords)
+%   centrek:                k-point at centre of plot(?)
+%   undersample_factor:     1 data point in undersample_factor points are missed along line in kspace
+%                           (i.e. 1 means include all points)
+%   haxes:                  handle of Matlab window to plot in
+%   clipintersectedfaces:   if true, makes the edges neatly trimmed to plot region (can be slow)
+
+%returns:
+%   haxes:                  handle to Matlab window
+%   hFSpatches:             Matlab patches of FS
+
+if ~isstruct(filenameORvar)
+    filename=filenameORvar;
+    if ~exist([filename '.mat'])        
+        filenotfound=true;
+    end
+    FS=load([filename '.mat']);
+else
+    FS=filenameORvar;
+end
+
+if isempty(bands)
+    bands=1:numel(FS.Wien2k_bandnums);
+end
+if isempty(bandcolours)
+    bandcolours=repmat([1 0 0],numel(bands),1);
+end
+if isempty(bplane_normals)
+    bplane_normals=FS.BZfacenormals*FS.rec_latt_vecs;
+end
+if isempty(incl_point)
+    incl_point=[0 0 0];
+end
+if isempty(centrek)
+    centrek=[0 0 0];
+end
+
+if ~isempty(undersample_factor)
+    [FS.cartX,FS.cartY,FS.cartZ,FS.cartE{bands(1)}] = reducevolume(FS.cartX,FS.cartY,FS.cartZ,FS.cartE{bands(1)},undersample_factor);
+    for bandnum=2:length(bands)
+        FS.cartE{bands(bandnum)} = reducevolume(FS.cartE{bands(bandnum)},undersample_factor);
+    end
+else
+    undersample_factor=1;
+end
+
+%if axes handle isn't provided see if can find previously raised window
+if isempty(haxes)
+    plothandle=findobj('Tag','FermiSurfacePlot');
+    if numel(plothandle)>1
+        plothandle=plothandle(1);
+    end
+    if isempty(plothandle) | ~ishandle(plothandle)
+        plothandle=figure('Tag','FermiSurfacePlot');
+    end
+    figure(plothandle);
+    haxes=gca;
+else
+    axes(haxes);
+end
+titlestr=sprintf('Wien2k FS:%s, band %s (spin %s)',FS.pathcasename,num2str(FS.Wien2k_bandnums(bands)'),num2str(FS.spindirns(bands)'));
+set(gcf,'Name',titlestr);
+
+%find Cart coords of smallest cuboid that includes all vertices of plotting vol defined by bplane_normals
+[bndryfaces bndryverts]=vol_vertices(bplane_normals,incl_point);
+exts=[min(bndryverts(:,1)) min(bndryverts(:,2)) min(bndryverts(:,3)); ...
+    max(bndryverts(:,1)) max(bndryverts(:,2)) max(bndryverts(:,3))];
+%round these exts out to the nearest x,y,z contained in FS.cartX,Y,Z
+exts./(repmat([FS.dx FS.dy FS.dz],2,1))
+exts=[ex
+
+if ~isempty(centrek)
+    exts=exts+repmat(centrek-mean(exts,1),2,1);
+end
+    
+[x y z]=ndgrid(exts(1,1):FS.dx*undersample_factor:exts(2,1),...
+    exts(1,2):FS.dy*undersample_factor:exts(2,2),...
+    exts(1,3):FS.dz*undersample_factor:exts(2,3));
+wrappedcoords=wrapcoords(x,y,z,FS);    
+wrappedcoords.X=permute(wrappedcoords.X,[2 1 3]); wrappedcoords.Y=permute(wrappedcoords.Y,[2 1 3]);
+wrappedcoords.Z=permute(wrappedcoords.Z,[2 1 3]);
+
+x=permute(x,[2 1 3]);
+y=permute(y,[2 1 3]);
+z=permute(z,[2 1 3]);
+
+    
+numbands=length(bands);
+for bandnum=1:numbands            
+    v=interp3(permute(FS.cartX,[2 1 3]),permute(FS.cartY,[2 1 3]),permute(FS.cartZ,[2 1 3]),...
+        permute(FS.cartE{bands(bandnum)},[2 1 3]),wrappedcoords.X(1:end),wrappedcoords.Y(1:end),...
+        wrappedcoords.Z(1:end));
+    v=reshape(v,[size(wrappedcoords.X,1) size(wrappedcoords.X,2) size(wrappedcoords.X,3)]);
+    
+    %compute vertices and faces of Fermi surface and plot the corresponding patch
+    %graphics object 
+    [faces,verts]=isosurface(x,y,z,v,FS.FermiLevel(FS.spindirns(bands(bandnum))),'verbose','noshare');
+    if ~isempty(bplane_normals)
+        [cfaces,cverts,fcolors]=clippatch(faces,verts,bplane_normals,[0 0 0],clipintersectedfaces);
+    else
+        cfaces=faces; cverts=verts; 
+    end
+    fcolors=repmat(bandcolours(bandnum,:),size(cfaces,1),1);
+    p=patch('Parent',haxes,'Faces',cfaces,'Vertices',cverts,'FaceVertexCData',fcolors);
+    %computes face normals from data and face normals of p equal to these 
+    isonormals(x,y,z,v,p);
+    set(p,'FaceColor','flat','edgecolor','none');
+    %make scaling of plot isotropic
+    daspect(haxes,[1 1 1]);
+    opengl software;    
+    %material shiny;
+    %create light on right of initial view
+    lights=findobj(gca,'Type','Light');
+    delete(lights);
+    light('Position',[1 0 0],'Style','infinite');
+    light('Position',[-1 0 0],'Style','infinite');
+    %set lighting algorithm
+    lighting gouraud;    
+    hFSpatches(bandnum)=p;
+    %alpha(p,0.9);
+end
+xlabel('k_x'); ylabel('k_y'); zlabel('k_z');

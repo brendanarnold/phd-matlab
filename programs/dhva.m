@@ -1,0 +1,324 @@
+function dhva(varargin);
+global actions shared;
+
+if numel(varargin)<1
+    path=[];
+end
+actions=[];
+hgui=dHvA_GUI;
+h=gethandles(hgui);
+shared.undersample_factor=[];
+initgui(h);
+shared.Palette=[1 0 0; 0 0 1; 0 1 0; 0 0.7 0.7; 0.7 0.7 0; 1 0 1; 0 0 0; 0 0.5 0];
+
+FSslice_params=struct('num_pts',200,'num_slices',100,'minfreq',100);
+shared.dirnstr=['up'; 'dn'];
+selorbitnums=[]; bandsdata=[];
+
+bandsdatafiles=recdir(path,'*.bands.mat');
+bandsdatafiles=struct2cell(bandsdatafiles);
+set(h.LB_bandsdatafiles,'String',bandsdatafiles(1,:));
+set(h.LB_bands,'String',[]);
+
+%orbitsdatafiles=recdir(path,'*.orbits.mat');
+%orbitsdatafiles=struct2cell(orbitsdatafiles);
+%set(h.LB_orbitsdatafiles,'String',orbitsdatafiles(1,:));
+
+while true;
+    while isempty(actions)
+        pause(0.1);
+    end
+    if strcmp(actions,'Selected bandsdatafile');
+        filenum=get(h.LB_bandsdatafiles,'Value');
+        bandsdata=load(bandsdatafiles{1,filenum});
+        if numel(fieldnames(bandsdata))==1
+            bandsdata=bandsdata.FS;
+        end
+        voltoplot='bz';
+        set(h.LB_bands,'String',cellstr([num2str(bandsdata.Wien2k_bandnums) ...
+            repmat(' ',length(bandsdata.Wien2k_bandnums),1) shared.dirnstr(bandsdata.spindirns,:)]));
+        
+        InfoStr{1}=sprintf('Wien2k case name=%s',bandsdata.pathcasename);
+        InfoStr{2}=sprintf('E matrix dims=%3.0fx%3.0fx%3.0f',bandsdata.cartdims);
+        InfoStr{3}=sprintf('Fermi level=%f',bandsdata.FermiLevel);
+        InfoStr{4}=sprintf('Rec latt vecs [Angstrom^{-2}]: \na=[%1.3f,%1.3f,%1.3f]\nb=[%1.3f,%1.3f,%1.3f]\nc=[%1.3f,%1.3f,%1.3f]',bandsdata.rec_latt_vecs);
+        set(h.ST_BandsdataInfo,'String',InfoStr);
+        actions=[];
+    end
+    if strcmp(actions,'Selected band');
+        selbandnums=get(h.LB_bands,'Value');
+        set(h.RB_PlotRegion1,'Enable','on');
+        set(h.RB_PlotRegion2,'Enable','on');
+        set(h.RB_PlotRegion3,'Enable','on');
+        for n=1:length(h.FSs)
+            if ishandle(h.FSs)
+                delete(h.FSs);
+            end
+        end
+        [h.Axes_FS h.FSs]=plot_FS(bandsdata,selbandnums,[],shared.Palette(selbandnums,:),voltoplot,[],[],shared.undersample_factor,[],true);
+        actions=[];
+    end
+    if strcmp(actions,'Selected extremal orbit');
+        selorbitnums=get(h.LB_ExtremalOrbits,'Value');        
+        [h.Axes_FS h.orbitlines]=update_orbitplot(h.Axes_FS,h.orbitlines,selorbitnums,rplotdata,orbitsdata.vertices);
+        axes(h.Axes_FS);
+        actions=[];
+    end
+    if strcmp(actions,'Changed undersampling')
+        RB1set=get(h.RB_Undersample1,'Value');
+        if RB1set
+            shared.undersample_factor=[];
+        else
+            RB2set=get(h.RB_Undersample2,'Value');
+            if RB2set
+                shared.undersample_factor=2;
+            else
+                shared.undersample_factor=3;
+            end
+        end
+        actions=[];
+    end
+    if strcmp(actions,'Changed clipping')
+        clipoption=find([get(h.RB_PlotRegion1,'Value') get(h.RB_PlotRegion2,'Value') get(h.RB_PlotRegion3,'Value')]);        
+        switch clipoption
+            case 1
+                voltoplot='bz';
+            case 2                
+                voltoplot='uc';
+            case 3
+                voltoplot=2*bandsdata.BZfacenormals*bandsdata.rec_latt_vecs;                
+        end
+        actions=[];
+    end
+    if strcmp(actions,'Clicked rotplot')
+        clickpos=get(h.Axes_Rotplot,'CurrentPoint');
+        xrange=xlim; yrange=ylim;
+        if exist('rplotdata') & ~isempty(rplotdata)
+        if shared.BackProjectRotplot
+            freq=[rplotdata.freq]-shared.MagField*shared.dMdB*[rplotdata.dFdM];
+        else
+            freq=[rplotdata.freq];
+        end
+        rplotdatadist=sqrt(((clickpos(1,1)-[rplotdata.angle]')./(xrange(2)-xrange(1))).^2+...
+            ((clickpos(1,2)-freq'/1000)./(yrange(2)-yrange(1))).^2);
+        newselnum=find(rplotdatadist==min(rplotdatadist));
+        if ismember(newselnum,selorbitnums)
+            selorbitnums(find(selorbitnums==newselnum))=[];
+        else
+            selorbitnums=sort([selorbitnums; newselnum]);
+        end
+        set(h.LB_ExtremalOrbits,'Value',selorbitnums);
+        [h.Axes_FS h.orbitlines]=update_orbitplot(h.Axes_FS,h.orbitlines,selorbitnums,rplotdata,orbitsdata.vertices);
+        h.Axes_Rotplot=update_rotplot(h.Axes_Rotplot,rplotdata,selorbitnums);
+        axes(h.Axes_FS);
+        end
+        actions=[];        
+    end
+    if strcmp(actions,'Changed backproj')
+        shared.BackProjectRotplot=get(h.CB_BackProject,'Value');
+        shared.dMdB=str2num(get(h.ET_dMdB,'String'));
+        if isnan(shared.dMdB)
+            shared.dMdB=0;
+        end
+        shared.MagField=str2num(get(h.ET_MagField,'String'));
+        if isnan(shared.MagField)
+            shared.MagField=0;
+        end
+        update_rotplot(h.Axes_Rotplot,rplotdata,selorbitnums);
+        update_orbitsbox(rplotdata,h.LB_ExtremalOrbits);
+        actions=[];
+    end   
+    if strcmp(actions,'Clicked ShowBZ')
+        shared.showBZ=get(h.CB_ShowBZ,'Value');
+        if shared.showBZ & ~isempty(bandsdata)            
+            if ~any(ishandle(h.Axes_FS))
+                hfig=figure('Tag','FermiSurfacePlot');
+                figure(hfig);
+                h.Axes_FS=gca;
+            else
+                axes(h.Axes_FS);
+            end
+            if strcmp(voltoplot,'uc');
+                h.BZpatch=plotvol(h.Axes_FS,ucfacenormals(bandsdata.rec_latt_vecs),[0.1 0.1 0.1]*bandsdata.rec_latt_vecs);
+            else
+                h.BZpatch=plotvol(h.Axes_FS,bandsdata.BZfacenormals*bandsdata.rec_latt_vecs,[0 0 0]);
+            end
+        elseif ~isempty(bandsdata) & any(ishandle(h.BZpatch))
+                delete(h.BZpatch);
+                axes(h.Axes_FS);
+        else
+            set(h.CB_ShowBZ,'Value',0);
+        end
+        actions=[];        
+    end
+    if strcmp(actions,'Open orbits file')
+        [filename pathname]=uigetfile('*.orbits.mat');  
+        if filename~=0 
+            selorbitnums=[];
+            set(h.LB_ExtremalOrbits,'Value',selorbitnums);
+            set(findobj(hgui,'Tag','Panel_ExtremalOrbits'),'Title',['Extremal Orbits - ' pathname filename]);
+            orbitsdata=load([pathname filename]);
+            rplotdata=struct('orbitnum',num2cell([1:size(orbitsdata.rplotdata,1)]'),...
+                'bandnum',num2cell(orbitsdata.rplotdata(:,5)),...
+                'Wien2k_bandnum',num2cell(orbitsdata.rplotdata(:,6)),...
+                'spindirn',num2cell(orbitsdata.rplotdata(:,7)),...
+                'angle',num2cell(orbitsdata.rplotdata(:,1)),...
+                'freq',num2cell(orbitsdata.rplotdata(:,10)),...            
+                'Bdirn',num2cell(orbitsdata.rplotdata(:,2:4),2),...
+                'kcentre',num2cell(orbitsdata.rplotdata(:,11:13),2),...
+                'kpara',num2cell(orbitsdata.rplotdata(:,14)),...
+                'curvfactor',num2cell(orbitsdata.rplotdata(:,17)),...
+                'mass',num2cell(orbitsdata.rplotdata(:,18)),...
+                'dFdM',num2cell(orbitsdata.rplotdata(:,19)));
+            update_orbitsbox(rplotdata,h.LB_ExtremalOrbits);
+                
+            axes(h.Axes_Rotplot);
+            cla;
+            update_rotplot(h.Axes_Rotplot,rplotdata,selorbitnums);
+        end
+        actions=[];
+    end
+    if strcmp(actions,'Clicked ShowContourplot')
+        if ~isempty(bandsdata) & numel(selorbitnums)>0 & get(h.CB_ShowContourPlot,'Value')==1
+            contourbandsstr=get(h.ET_ContourPlotBands,'String');
+            contourplotbands=str2num(cell2mat(delimstr2cell(contourbandsstr,','))');
+            plot_FSslice3([],rplotdata(selorbitnums(end)).Bdirn,rplotdata(selorbitnums(end)).kpara,bandsdata,contourplotbands,true,true,false,FSslice_params);
+        else
+            set(h.CB_ShowContourPlot,'Value',0);
+        end
+        actions=[];
+    end   
+    if strcmp(actions,'Close')
+        delete(h.MainWindow);
+        actions=[];
+        return;
+    end   
+    pause(0.1);
+end
+
+%-------------------------------------------------------------------------
+function h=gethandles(hgui);
+
+h.LB_bandsdatafiles=findobj(hgui,'Tag','LB_bandsdatafiles');
+h.LB_orbitsdatafiles=findobj(hgui,'Tag','LB_orbitsdatafiles');
+h.LB_ExtremalOrbits=findobj(hgui,'Tag','LB_ExtremalOrbits');
+h.LB_bands=findobj(hgui,'Tag','LB_bands');
+h.Axes_FS=findobj(hgui,'Tag','Axes_FS'); 
+if numel(h.Axes_FS)>1
+    h.Axes_FS=h.Axes_FS(1);
+end
+h.ST_BandsdataInfo=findobj(hgui,'Tag','ST_BandsdataInfo');
+h.orbitlines=[]; h.FSs=[];
+h.RB_Undersample1=findobj(hgui,'Tag','RB_Undersample1');
+h.RB_Undersample2=findobj(hgui,'Tag','RB_Undersample2');
+h.RB_Undersample3=findobj(hgui,'Tag','RB_Undersample3');
+h.RB_PlotRegion1=findobj(hgui,'Tag','RB_PlotRegion1');
+h.RB_PlotRegion2=findobj(hgui,'Tag','RB_PlotRegion2');
+h.RB_PlotRegion3=findobj(hgui,'Tag','RB_PlotRegion3');
+h.CB_ShowBZ=findobj(hgui,'Tag','CB_ShowBZ');
+h.MainWindow=findobj(hgui,'Tag','MainWindow');
+h.Axes_Rotplot=findobj(hgui,'Type','axes');
+delete(h.Axes_Rotplot);
+if ~any(ishandle(h.Axes_Rotplot))
+    h.Axes_Rotplot=axes('Tag','Axes_RotPlot','Position',[0.49 0.07 0.5 0.60],'NextPlot','Add',...
+        'ButtonDownFcn','dHvA_GUI(''Axes_Rotplot_ButtonDown_Callback'',gcbo,[],guidata(gcbo))');
+end
+h.CB_BackProject=findobj(hgui,'Tag','CB_BackProject');
+h.CB_ShowContourPlot=findobj(hgui,'Tag','CB_ShowContourPlot');
+h.ET_dMdB=findobj(hgui,'Tag','ET_dMdB');
+h.ET_MagField=findobj(hgui,'Tag','ET_MagField');
+h.ET_ContourPlotBands=findobj(hgui,'Tag','ET_ContourPlotBands');
+
+%-------------------------------------------------------------------------
+function initgui(h);
+global shared;
+
+set(h.RB_Undersample1,'Value',isempty(shared.undersample_factor));
+set(h.RB_Undersample2,'Value',isequal(shared.undersample_factor,2));
+set(h.RB_Undersample3,'Value',isequal(shared.undersample_factor,3));
+set(h.RB_PlotRegion1,'Value',1);
+set(h.RB_PlotRegion2,'Value',0);
+set(h.RB_PlotRegion3,'Value',0);
+set(h.RB_PlotRegion1,'Enable','off');
+set(h.RB_PlotRegion2,'Enable','off');
+set(h.RB_PlotRegion3,'Enable','off');
+set(h.CB_ShowBZ,'Value',0);
+shared.BackProjectRotplot=false;
+set(h.CB_BackProject,'Value',shared.BackProjectRotplot);
+shared.dMdB=0;
+set(h.ET_dMdB,'String',num2str(shared.dMdB));
+shared.MagField=0;
+set(h.ET_MagField,'String',num2str(shared.MagField));
+currpos=get(h.MainWindow,'Position');
+set(h.MainWindow,'Position',[1 4 currpos(3) currpos(4)]);
+
+%-------------------------------------------------------------------------
+function [newhaxes, newhandles]=update_orbitplot(haxes,horbitlines,selorbitnums,rplotdata,vertices);
+global shared;
+
+newhandles=[]; newhaxes=haxes;
+
+if ~any(ishandle(haxes))
+    hfig=figure('Tag','FermiSurfacePlot');
+    figure(hfig);
+    haxes=gca;
+end    
+
+for orbitlinenum=length(horbitlines):-1:1
+    if ishandle(horbitlines(orbitlinenum))
+        delete(horbitlines(orbitlinenum));
+    end
+    horbitlines(orbitlinenum)=[];
+end
+for selnum=1:length(selorbitnums)
+    orbitlinespec.Color=[1 1 1]-getbandcolor(rplotdata(selorbitnums(selnum)).Wien2k_bandnum,...
+        rplotdata(selorbitnums(selnum)).spindirn,shared.Palette);
+    orbitlinespec.LineWidth=3;            
+    [newhaxes orbithandle]=plotorbit(haxes,vertices,selorbitnums(selnum),orbitlinespec);
+    if ~isempty(orbithandle)
+        newhandles(selnum)=orbithandle;
+    end
+end
+
+%-------------------------------------------------------------------------
+function haxes=update_rotplot(haxes,rplotdata,selorbitnums);
+global shared;
+axes(haxes);
+rotplotbands=unique([rplotdata.bandnum]);
+hbandrotplotlines=[];
+for bandnum=1:length(rotplotbands)            
+    bandrplotdata=rplotdata(find([rplotdata.bandnum]==rotplotbands(bandnum)));      
+    params=struct('LineSpec','o','MarkerSize',4,'MarkerEdgeColor',getbandcolor(bandrplotdata(1).Wien2k_bandnum,bandrplotdata(1).spindirn,shared.Palette));        
+    hbandrotplotlines(bandnum)=plotrotplot(bandrplotdata,ismember([bandrplotdata.orbitnum],selorbitnums),shared.BackProjectRotplot,shared.dMdB,shared.MagField,params);            
+    legendstr{bandnum}=[num2str(rplotdata(find([rplotdata.bandnum]==rotplotbands(bandnum),1)).Wien2k_bandnum) ...
+    shared.dirnstr(rplotdata(find([rplotdata.bandnum]==rotplotbands(bandnum),1)).spindirn,:)];
+end
+xlabel(haxes,'Angle [degrees]'); ylabel(haxes,'F [kT]');        
+legend(hbandrotplotlines,legendstr,'Location','best');
+haxes=gca;
+
+%-------------------------------------------------------------------------
+function update_orbitsbox(rplotdata,hbox);
+global shared;
+
+coltitlestr=sprintf('No. Band Angle Freq(corr)kT [kx ky kz] curv_factor m_b/m_e dF/dM');
+set(findobj('Tag','ST_OrbitsBoxTitles'),'String',coltitlestr);
+corrfreq=[rplotdata.freq]-shared.MagField*shared.dMdB*[rplotdata.dFdM];
+for orbitnum=1:numel(rplotdata)
+    linestr{orbitnum}=sprintf('%3.0f %2.0f%s %+3.0f %2.3f(%2.3f) [%+1.3f %+1.3f %+1.3f] %+1.1e %+1.3f %+1.2e',...
+        orbitnum,...
+        rplotdata(orbitnum).Wien2k_bandnum,...
+        shared.dirnstr(rplotdata(orbitnum).spindirn),...
+        rplotdata(orbitnum).angle,...
+        rplotdata(orbitnum).freq/1000,...
+        corrfreq(orbitnum)/1000,...
+        rplotdata(orbitnum).kcentre,...
+        rplotdata(orbitnum).curvfactor,...
+        rplotdata(orbitnum).mass,...
+        rplotdata(orbitnum).dFdM);
+end
+set(hbox,'String',linestr);
+
+%-------------------------------------------------------------------------
+function color=getbandcolor(bandnum,spindirn,palette);
+color=palette(1+mod(spindirn+2*bandnum-2,8),:);

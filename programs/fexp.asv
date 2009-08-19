@@ -1,0 +1,81 @@
+function varargout=fexp(bands,casename,energyext,newcartdims,mcell);
+%function varargout=fexp(bands,casename,energyext,newcartdims,mcell);
+%
+%output: [cartE] or [cartE cartX cartY cartZ]
+%runs the fortran prog fexp to generate Fourier interpolation coeffs from Wien2k output
+%mcell is size of tileable cuboid in units of a*_x b*_y c*_z
+
+fexppath=fileparts(which('fexp.m'));
+new_cart_gridsp=[bands.cuboidextents(2,1)/(newcartdims(1)-1) ...
+    bands.cuboidextents(2,2)/(newcartdims(2)-1) ...
+    bands.cuboidextents(2,3)/(newcartdims(3)-1)];
+%ignoring submesh shift for now
+
+%bodge follows
+switch bands.latt_type
+    case {'F','B'}
+        new_prim_gridsp=abs(max([new_cart_gridsp(1) 0 0; 0 new_cart_gridsp(2) 0; 0 0 new_cart_gridsp(3)]*inv(bands.rlvs),[],2));
+    case {'C','P','H'}
+        new_prim_gridsp=abs(diag([new_cart_gridsp(1) 0 0; 0 new_cart_gridsp(2) 0; 0 0 new_cart_gridsp(3)]*inv(bands.rlvs)));
+end        
+%was: new_prim_gridsp=abs(diag([new_cart_gridsp(1) 0 0; 0 new_cart_gridsp(2) 0; 0 0 new_cart_gridsp(3)]*inv(bands.rlvs)));
+%which works for Y124,YBCO
+
+prim_gridorig=[bands.cuboidextents(1,1) bands.cuboidextents(1,2) bands.cuboidextents(1,3)]*inv(bands.rlvs);
+    
+%write text input file for fexp.exe (grid info)
+fid=fopen('fexpinp.txt','w');
+fprintf(fid,'''%s'',''%s''\r\n',casename,energyext);
+fprintf(fid,'%16.10e %16.10e %16.10e %16.10e %16.10e %16.10e %i %i %i %i %i\r\n',...
+    [0 0 0], mcell(1)*new_prim_gridsp(1),mcell(2)*new_prim_gridsp(2),mcell(3)*new_prim_gridsp(3), newcartdims,bands.Wien2k_bandnums(1),bands.Wien2k_bandnums(end));
+%ignoring submesh shift for now
+fclose(fid);
+
+%delete existing fexp output files
+
+%put correct Fermi Level in intrans file
+if ~exist([pwd '\fexp.intrans'],'file');
+    copyfile([fexppath '\fexp.intrans'],[pwd '\fexp.intrans']);
+end
+
+copyfile([fexppath '\fexp.exe'],'fexp.exe');
+%copyfile(['C:\Work\Bandstruct\Boltztrap\SRC_BoltzTraP110' '\fexp.exe'],'fexp.exe');
+if ~exist([pwd '\fexp.def'],'file');
+    copyfile([fexppath '\fexp.def'],[pwd '\fexp.def']);
+end
+
+fid=fopen('fexp.intrans','r+');
+ln=1;
+while ~feof(fid)
+    lstr{ln}=fgetl(fid);
+    ln=ln+1;
+end
+nl=ln-1;
+lstr{3}=[sprintf('%6.5f',bands.FermiLevel(1)) lstr{3}(8:end)];
+fseek(fid,0,'bof');
+for ln=1:nl
+    fprintf(fid,'%s\r\n',lstr{ln});
+end
+fclose(fid);
+    
+%execute Fortran prog to calc Fourier interp energies
+cmdstr=['fexp fexpinp.txt'];
+[status outstr]=dos(cmdstr,'-echo');
+disp('Waiting for fexp to finish');
+while ~exist('DONE','file')
+end
+delete('DONE');
+
+newE=loadexpene([casename '.expene.bin']);
+for n=1:size(newE,4)
+    cartE{n}=squeeze(newE(:,:,:,n));
+end
+varargout{1}=cartE;
+
+if nargout==4
+    [varargout{2} varargout{3} varargout{4}]=ndgrid(0:new_cart_gridsp(1):bands.cuboidextents(2,1),...
+        0:new_cart_gridsp(2):bands.cuboidextents(2,2),...
+        0:new_cart_gridsp(3):bands.cuboidextents(2,3));
+end
+
+

@@ -1,0 +1,63 @@
+function energy=importenergy(infilename,bandnums);
+%function energy=importenergy(infilename);
+%
+%reads Wien2k case.energy(up/dn) file and returns result in a 2d array
+%energy(bandnum,kpointnum)
+infile=fopen(infilename,'r');
+if infile==-1
+    disp('case.energy file not found');
+    energy=[];
+    return;
+end
+disp(['Importing energies from ' infilename]);
+
+indexfieldpos=[0 19 38 57 67 73 79 84];
+numfields=length(indexfieldpos)-1;
+
+stillinheader=true;
+while stillinheader
+        headerline=fgetl(infile);
+        %test whether line is index line for first kpoint
+        n=sscanf(headerline,'%f',7);
+        if n(1:3)==[0; 0; 0]
+            stillinheader=false;
+            indexlinestr=headerline;
+            numbands=n(6);
+        end        
+end
+
+energy=zeros(numbands,numkpoints);
+kpointnum=1;
+notatend=true;
+atfirstline=true;
+while notatend
+    if atfirstline
+            atfirstline=false;
+    else
+            indexlinestr=fgetl(infile);
+    end
+    if indexlinestr==-1
+            notatend=false;
+            break;
+    end
+    indexrow=zeros(1,numfields);
+    for fieldnum=1:numfields
+        fieldstr=indexlinestr(indexfieldpos(fieldnum)+1:indexfieldpos(fieldnum+1));
+        fieldval=str2num(fieldstr);
+        if ~isempty(fieldval)
+            indexrow(1,fieldnum)=fieldval;
+        else
+            indexrow(1,fieldnum)=NaN;
+        end
+    end
+    kpoints(kpointnum,:)=indexrow(1,1:3);
+    for bandnum=1:indexrow(6)
+        linestr=fgetl(infile);
+        redundant=str2num(linestr(1:13));
+        if redundant~=bandnum
+            disp('Problem!');
+        end
+        energy(bandnum,kpointnum)=str2num(linestr(14:end));
+    end
+    kpointnum=kpointnum+1;
+end

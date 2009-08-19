@@ -1,0 +1,19 @@
+function [newhaxes,handle]=plotorbit(haxes,vertices,orbitnum,params);
+
+if ~any(ishandle(haxes))
+    figure;
+    haxes=axes;
+else
+    axes(haxes);
+end
+
+hold on;
+if isnumeric(vertices{orbitnum}) & ~isempty(vertices{orbitnum})
+    handle=plot3(vertices{orbitnum}(:,1),vertices{orbitnum}(:,2),vertices{orbitnum}(:,3));
+    if ~isempty(params)
+        set(handle,'LineWidth',params.LineWidth,'Color',params.Color);
+    end
+else
+    handle=[];
+end
+newhaxes=haxes;

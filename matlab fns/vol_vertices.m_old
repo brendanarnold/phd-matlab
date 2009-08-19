@@ -1,0 +1,89 @@
+function [faces,vertices]=vol_vertices(planenormals,incl_point);
+%function vertices=vol_vertices(planenormals);
+%
+%generates vertices of surface enclosed by set of planenormals
+
+%first calc r0's and d's of bounding lines i.e. intersection of search vol
+%and slice planes (see p55 lab book III)
+np=size(planenormals,1);
+p=nan(np,np,np,3); r0=nan(np,np,3); d=nan(np,np,3);
+for plnum1=1:np
+    n1=planenormals(plnum1,:);
+    for plnum2=plnum1+1:np
+        n2=planenormals(plnum2,:);
+        denom=(dot(n2,n1)^2-dot(n2,n2)*dot(n1,n1));
+        if abs(denom)>1e-10
+            r0(plnum1,plnum2,:)=(dot(n2,n2)*(dot(n1,n2)-dot(n1,n1))*n1+dot(n1,n1)*(dot(n2,n1)-dot(n2,n2))*n2)/denom;
+        else 
+            r0(plnum1,plnum2,:)=Inf;
+        end
+        r0(plnum2,plnum1,:)=r0(plnum1,plnum2,:);
+        d(plnum1,plnum2,:)=cross(n1,n2);
+        denom=norm(permute(d(plnum1,plnum2,:),[1 3 2]));
+        if abs(denom)>1e-10
+            d(plnum1,plnum2,:)=d(plnum1,plnum2,:)/denom;
+        else
+            d(plnum1,plnum2,:)=Inf;
+        end
+        d(plnum1,plnum2,:)=d(plnum1,plnum2,:);
+        d(plnum2,plnum1,:)=d(plnum1,plnum2,:);
+    end
+end
+%now find intersection points of all pairs of lines
+for plnum1=1:np
+    n1=planenormals(plnum1,:);
+    for plnum2=1:np
+        if plnum2==plnum1
+            continue;
+        end
+        q=cross(n1,permute(d(plnum1,plnum2,:),[1 3 2]))/(norm(n1)*norm(permute(d(plnum1,plnum2,:),[1 3 2])));
+        for plnum3=(plnum2+1):np
+            if (plnum3==plnum1) | (plnum3==plnum2)
+                continue;
+            end 
+            denom=dot(permute(d(plnum1,plnum3,:),[1 3 2]),q);
+            if abs(denom)<1e-10
+                lamda2=Inf;
+            else
+                lamda2=dot(permute(r0(plnum1,plnum2,:),[1 3 2])-permute(r0(plnum1,plnum3,:),[1 3 2]),q)/denom;
+            end
+            p(plnum1,plnum2,plnum3,:)=r0(plnum1,plnum3,:)+lamda2*d(plnum1,plnum3,:);    
+            p(plnum1,plnum3,plnum2,:)=nan;
+        end
+    end
+end
+
+plist=reshape(p,np^3,3);
+validpts=find(~any(isnan(plist) | isinf(plist),2));
+outside=isoutside(planenormals,incl_point,plist(validpts,:),1e-4);
+plist(validpts(outside~=0),:)=nan;
+p=reshape(plist,plnum1,plnum2,plnum3,3);
+
+%make list of bounding pts in correct order to define polygon
+%rs and cs are row, col coords of valid bounding points in matrix of line
+%intersections p. Need to find order n such that for each change n->n+1
+%only one of r or c changes
+faces=[]; vertices=[];
+for plnum1=1:np
+    subset_p=squeeze(p(plnum1,:,:,:));
+    [rs cs]=find(~(all(subset_p==0,3) | any(isnan(subset_p) | isinf(subset_p),3)));
+    n=[1];
+    for pnum=2:length(rs)
+        %tn is pair of points that share one line with current point
+        tn=setdiff(find(rs==rs(n(pnum-1)) | cs==rs(n(pnum-1)) | cs==cs(n(pnum-1)) | rs==cs(n(pnum-1))),n);
+        n(pnum)=tn(1);        
+    end
+    for pnum=1:length(rs)
+        vertices(end+1,:)=[p(plnum1,rs(n(pnum)),cs(n(pnum)),1) p(plnum1,rs(n(pnum)),cs(n(pnum)),2) p(plnum1,rs(n(pnum)),cs(n(pnum)),3)];
+        if pnum>size(faces,2) & size(faces,1)>0
+            %bug in matlab: should pad faces with <max vert with nans but
+            %this causes extra edges to appear
+            faces=[faces faces(:,size(faces,2))];
+        end
+        faces(plnum1,pnum)=size(vertices,1);
+    end
+    padcols=(length(rs))+1:size(faces,2);
+    if ~isempty(padcols)
+        faces(end,padcols)=faces(end,length(rs));
+    end
+end

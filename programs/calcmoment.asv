@@ -1,0 +1,41 @@
+function results=calcmoment(bandsdata,bandnums,FermiLevels)
+%function results=calcmoment(bandsdata,bandnums,FermiLevels)
+%
+%calc the no. of carriers per unit cell of bands in bandsdata structure
+%if bandsdata has spinpolarized bands (indicated by spindirns array), returns a
+%moment; spindirns=1 +ve, 2 -ve
+%uses IDOS(E) already in the structure
+%if an array of bandnums is provided only entries in the array are used
+%returns array of band indexes and band-moments with total moment in last
+%column
+
+if isempty(bandnums)
+    bandnums=1:length(bandsdata.Wien2k_bandnums)
+end
+if isempty(FermiLevels)
+    FermiLevels=bandsdata.FermiLevel(bandsdata.spindirns(bandnums));
+end
+
+numbands=length(bandnums);
+for bandnum=1:numbands
+    if FermiLevels(bandnum)<min(bandsdata.DOS_E{bandnums(bandnum)})
+        moment(bandnums(bandnum))=0;
+        DOS(bandnums(bandnum))=0;
+    else
+        if FermiLevels(bandnum)>max(bandsdata.DOS_E{bandnums(bandnum)})
+            moment(bandnums(bandnum))=1;
+            DOS(bandnums(bandnum))=0;
+        else
+            moment(bandnums(bandnum))=interp1(bandsdata.DOS_E{bandnums(bandnum)},bandsdata.IDOS{bandnums(bandnum)},...
+                FermiLevels(bandnum));
+            DOS(bandnums(bandnum))=interp1(bandsdata.DOS_E{bandnums(bandnum)},bandsdata.DOS{bandnums(bandnum)},...
+                FermiLevels(bandnum));
+        end
+    end
+end
+momentsign=(bandsdata.spindirns==0)+(bandsdata.spindirns==1)-(bandsdata.spindirns==2);
+
+
+disp('band 1, band 2, ..., total');
+disp('moment, moment, ..., moment');
+results=[[bandnums -1 -1 -1]; [moment.*momentsign sum(moment.*momentsign)]];

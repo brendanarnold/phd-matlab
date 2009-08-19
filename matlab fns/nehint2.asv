@@ -1,0 +1,34 @@
+function amp=nehint;
+
+integ_tol=1e-6;
+a1=4.7596; a2=0.49959; a4=3.2439; a6=-14.497; a8=33.951; a10=-35.166; a12=14.197;
+b1=3.9754; b2=-0.55983; b4=-10.496; b6=89.459; b8=-394.15; b10=936.68; b12=-1232.7; b14=844.38; b16=-235.57;
+a=3.85; d=6.4; e=1.6; hbar=1.05;
+
+for t=1:10
+    amp(t)=quad(@integrand,0,2*pi,integ_tol);
+    sxx0X=e^2/(4*pi^3*hbar)*(2*Pi)/d*4*amp(t);
+    rxx0X=1/sxx0X;
+end
+
+    function sxx0X_intval=integrand(th);
+        kf=a1+a2*cos(2*th).^2+a4*cos(2*th).^4+a6*cos(2*th).^6+a8*cos(2*th).^8+a10*cos(2*th).^10+a12*cos(2*th).^12;
+        vf=b1+b2*cos(2*th).^2+b4*cos(2*th).^4+b6*cos(2*th).^6+b8*cos(2*th).^8+b10*cos(2*th).^10+b12*cos(2*th).^12+b14*cos(2*th).^14+b16*cos(2*th).^16;
+        k2=log(kf);
+        diffk=diff(k2)/(;
+        ang=atan(diffk);
+        gamma_iso=0.0018*t.^2;
+        gamma_0=60/vf;
+        gamma_max=780;
+        gamma_ideal=gamma_0+gamma_iso;
+        cosang=cos(ang);
+        tau=(gamma_ideal+gamma_max)/(gamma_ideal.*gamma_max);
+    
+        %The derivatives
+        % derivXY=differentiate((vf*sin(th-ang).*tau),th);
+        % derivXX1=differentiate((vf*cos(th-ang).*tau),th);
+        % derivXX2=differentiate(((vf*cosang.*derivXX1.*tau)/kf),th);
+        
+        sxx0X_intval=kf.*vf.*((cos(th-ang)^2).*tau)/cosang;
+    end
+end

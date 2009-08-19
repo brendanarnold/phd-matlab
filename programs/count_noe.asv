@@ -1,0 +1,41 @@
+function noe=count_noe(bands,Estep,convcrit,filename)
+%function noe=count_noe(bands,Estep,convcrit,filename)
+%
+%calcs number of electron and DOS_EF for all bands in bands (which can be spin pol)
+%Estep is step size for evaluation of DOS (Ryd)
+%convcrit is max permissible fractional std error of DOS(E_F). if vec of 2 values is provided, 2nd
+%value is abs std error which also satisfies convergence
+%filename for output file
+
+if nargin==1
+    Estep=0.001; interplevels=1;
+end
+
+dirnstr={'up' 'dn'};
+
+totDOStable=[0 0 0];
+disp('DOS in states/unit cell/eV (per spin if spin pol.)');
+for bnum=1:numel(bands.cartE)
+    [E DOS IDOS]=calcDOS2(Estep,bands.cartE{bnum},bands.FermiLevel(bands.spindirns(bnum)),convcrit,'linear',false,true);
+    noe(bnum)=interp1(E,IDOS,bands.FermiLevel(bands.spindirns(bnum)))/IDOS(end);
+    DOSEF(bnum)=interp1(E,DOS,bands.FermiLevel(bands.spindirns(bnum)),'linear')/13.6;
+    disp(['Band ' num2str(bands.Wien2k_bandnums(bnum)) ' (' dirnstr{bands.spindirns(bnum)} '): noe=' num2str(noe(bnum)) ...
+        ', DOS=' num2str(DOSEF(bnum),'%3.3f')]);
+    %merge current E,DOS into single matrix with cols: E, totDOS_up, totDOS_dn
+    [ismem loc]=ismember(E,totDOStable(:,1));
+    col=1+bands.spindirns(bnum);
+    if
+    totDOStable(loc(loc~=0),col)=totDOStable(loc(loc~=0),col)+DOS(ismem);
+    lastind=size(totDOStable,1);
+    totDOStable(lastind+1:lastind+numel(find(tf)),:)=[E(~ismem); zeros(numel(find(~ismem)),2)];
+    totDOStable(lastind+1:lastind+numel(find(tf)),col)=DOS(~ismem);    
+end
+noe_up=sum(noe(bands.spindirns==1));
+noe_dn=sum(noe(bands.spindirns==2));
+DOSEF_up=sum(DOSEF(bands.spindirns==1));
+DOSEF_dn=sum(DOSEF(bands.spindirns==2));
+disp(['Tot noe: up=' num2str(noe_up,'%3.3f') ' dn=' num2str(noe_dn,'%3.3f') ' up-dn=' num2str(noe_up-noe_dn) ...
+    '. DOS up=' num2str(DOSEF_up,'%3.3f') ' dn=' num2str(DOSEF_dn,'%3.3f')]);
+
+
+save([filename '.DOS.mat'],'noe','DOSEF','convcrit','noe_up','noe_dn','DOSEF_up','DOSEF_dn','totDOStable');
