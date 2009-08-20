@@ -72,7 +72,7 @@ b.n_rlvs=b.rlvs./repmat(denom,3,1); %repmat(diag(b.rlvs)',3,1);
 
 %.klist contains: dims; IBZ kpoint no., rec latt coord kx/(a_x/d),ky/(b_y/d),kz/(c_z/d), d=denominator,
 %weight (i.e. no. of symmetry rel points incl IBZ one)
-disp('Reading dims, Cartesian IBZ coords from .klist');
+ disp('Reading dims, Cartesian IBZ coords from .klist');
 infile=fopen([b.pathcasename '.klist'],'r');
 if infile==-1
     disp('File not found: case.klist');

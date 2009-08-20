@@ -35,7 +35,8 @@ while notatend
     if ismember(length(linestr),formatinfo.indexlinelengths)
         kptnum=kptnum+1;
         for fnum=1:numfields
-            value=str2num(linestr(formatinfo.indexfieldpos(fnum)+1:formatinfo.indexfieldpos(fnum+1)));
+            str_buffer=linestr(formatinfo.indexfieldpos(fnum)+1+formatinfo.skipleadchars(fnum):formatinfo.indexfieldpos(fnum+1));
+            value=str2num(str_buffer);
             if numel(value)==1
                 fieldval(fnum)=value;                
             end
