@@ -42,7 +42,11 @@ if isempty(params)
         ', no. of slices per B dirn=' num2str(params.num_slices) ', min_F=' num2str(params.minfreq)]);
 end
 
-if length(angleincORlist)>1
+% Hacked slightly so that if cell array is passed, can have just one angle
+% specified
+if iscell(angleincORlist)
+    angles = [angleincORlist{1}];
+elseif length(angleincORlist)>1
     angles=angleincORlist;
     numsteps=length(angles);
 else
@@ -54,6 +58,7 @@ for bandnum=1:length(bandnums)
     disp(['Searching band ' num2str(bandnum) '/' num2str(length(bandnums)) ' (' num2str(bandsdata.Wien2k_bandnums(bandnums(bandnum))) ').']);
     rotplotdata{bandnum}=[];
     for stepnum=1:numsteps
+        disp(['    Angle ' num2str(angles(stepnum))]);
         [Bdirn(1) Bdirn(2) Bdirn(3)]=rotate3axis(initBdirn(1),initBdirn(2),initBdirn(3),rotaxis,angles(stepnum)/360*2*pi);    
         eos=extremalorbits(Bdirn,bandsdata,bandnums(bandnum),params);
         numorbits=size(eos{1},1);

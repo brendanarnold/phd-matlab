@@ -36,7 +36,7 @@ normalreclatt=normal*cart2reclatt;
 if ~exist('kparas') || isempty(kparas)
     %kpara values have not been provided in input arguments
     %kpara range is found by calc intersection of normal with all planes that bound centresvol
-    %note does not work if sea
+    %note does not work if search volume is not centred on Gamma point
     if isempty(bandsdata.centresvol)
         bvecs=bandsdata.BZfacenormals*bandsdata.rec_latt_vecs;
     else
@@ -76,7 +76,7 @@ dk=minwidth/(params.num_pts-1);
 allorbits{1}=[];
 for bandnum=1:length(bandnums)
     for slicenum=1:size(kparas,2)
-        if slicenum==103
+        if slicenum==40
             debug=true;
         end
         slice=sliceFS(normal,inplanedirns,kparas(slicenum),dk,bandsdata,bandnums(bandnum));
@@ -92,7 +92,7 @@ for bandnum=1:length(bandnums)
     
     if ~isempty(allorbits{bandnum})
         %identify orbits as fn of kpara 
-        branchnumbers=grouporbits(allorbits{bandnum},kparas,6,2,fdiff_threshold,3,kdiff_threshold,1);
+        branchnumbers=grouporbits_test(allorbits{bandnum},kparas,6,2,fdiff_threshold,3,kdiff_threshold,1);
         for branchnum=1:max(branchnumbers)
             branches{bandnum}{branchnum}(:,:)=allorbits{bandnum}(branchnumbers==branchnum,:);
             branches{bandnum}{branchnum}=[branches{bandnum}{branchnum} repmat(dk,[size(branches{bandnum}{branchnum},1) 1])];

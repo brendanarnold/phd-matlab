@@ -1,10 +1,13 @@
 function results=calcrotplot(bandsdata,bandnums,FermiLevelOffsets,initBdirn,rotaxis,angleincORlist,numsteps,masscalc_deltaE,pathfilename,params,deltaM_bandsdata,deltaM);
 %function results=calcrotplot(bandsdata,bandnums,FermiLevelOffsets,initBdirn,rotaxis,angleincORlist,numsteps,masscalc_deltaE,pathfilename,params,deltaM_bandsdata,deltaM);
 %
+%calls extremalorbits.m at a series of angles to make rotation plot
+%arguments:
 %bandsdata:         structure as output by convert_W2kE
 %bandnums:          bands to include in rot plot calc (empty means all)
 %FermiLevelOffsets: offset in Ryd to apply to Wien2k calc Fermi level (empty means zero). 2x1 matrix required for spin pol case
 %initBdirn:         B dirn corresponding to zero angle in rot plot (Cartesian coord in reciprocal space)
+%                       e.g. for hex this means [1 0 0], [0.5 sqrt(3)/2 0], [0 0 1] are parallel to reciprocal lattice vectors a, b and c respectively.
 %rotaxis:           axis that B is rotated about in rot plot (Cartesian coord in reciprocal space)
 %angleincORlist:    increment angle (if single num) or 1xn matrix of angles
 %numsteps:          number of angles to calc at
@@ -17,12 +20,6 @@ function results=calcrotplot(bandsdata,bandnums,FermiLevelOffsets,initBdirn,rota
 %deltaM_bandsdata:  bandstructure at close value of M (only used in spin pol calc for finding df/dM)
 %deltaM:            difference in M between deltaM_bandsdata and bandsdata
 
-
-
-%params is struct with fields: minfreq, num_pts, num_slices
-%(for spin pol calc) deltaM_bandsdata is a bands structure containing bandstructure at value of M
-%differing by deltaM
-%calls extremalorbits.m at a series of angles to make rotation plot
 %structure of output:
 %col 1: angle
 %2-4: Bdirn(x,y,z)
@@ -31,6 +28,8 @@ function results=calcrotplot(bandsdata,bandnums,FermiLevelOffsets,initBdirn,rota
 %7: spindirn
 %8-17: same as extremalorbits
 
+colnames={'angle','B_x','B_y','B_z','bandnum','W2k_bandnum','spindirn','branch','area','freq',...
+    'kx','ky','kz','kpara','slicenum','dk','curvature','m_b','dFdM'};
 if ~isempty(FermiLevelOffsets)
     bandsdata.FermiLevel=bandsdata.FermiLevel+FermiLevelOffsets;
 end
@@ -62,6 +61,7 @@ for bandnum=1:length(bandnums)
             rotplotdata{bandnum}=[rotplotdata{bandnum}; [ones(numorbits,1)*[angles(stepnum) Bdirn bandnums(bandnum) bandsdata.Wien2k_bandnums(bandnums(bandnum)) bandsdata.spindirns(bandnums(bandnum))] eos{1}(:,:)]];
         end
         disp(['    Dirn ' num2str(stepnum) '/' num2str(numsteps) '. Num orbits:' num2str(numorbits)]);        
+        pause(0.1); drawnow;
     end
 
     %calculate masses
@@ -78,7 +78,7 @@ for bandnum=1:length(bandnums)
     %(replace existing 'branch' column)
     kdiff_threshold=sqrt(bandsdata.dx^2+bandsdata.dy^2+bandsdata.dz^2);
     fdiff_threshold=10000;
-    rotplotdata{bandnum}(:,8)=grouporbits(rotplotdata{bandnum},angles,1,10,fdiff_threshold,11,kdiff_threshold,2);
+    rotplotdata{bandnum}(:,8)=grouporbits_test(rotplotdata{bandnum},angles,1,10,fdiff_threshold,11,kdiff_threshold,2);
 
     if size(rotplotdata{bandnum},1)==0
         rotplotdata{bandnum}=zeros(0,19);
@@ -92,7 +92,7 @@ for bandnum=1:length(bandnums)
         if ~isempty(pathstr)
             pathstr=['\' pathstr];
         end
-        save([pathstr name '.orbits.mat'],'rplotdata','vertices','params');
+        save([pathstr name '.orbits.mat'],'rplotdata','vertices','params','colnames');
     end
 end
 

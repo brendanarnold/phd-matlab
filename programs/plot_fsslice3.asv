@@ -1,10 +1,11 @@
-function plot_FSslice3(haxes,normal,kpara,vol,bandsdata,FermiLevelShift,bandnums,bandcolors,justFermicontour,showlabels,plot3d,draworbits,params,varargin);
+function [a,b,c]=plot_FSslice3(haxes,normal,kpara,vol,bandsdata,FermiLevelShift,bandnums,bandcolors,justFermicontour,showlabels,plot3d,draworbits,params,varargin);
 %function plot_FSslice3(haxes,normal,kpara,vol,bandsdata,FermiLevelShift,bandnums,bandcolors,justFermicontour,showlabels,plot3d,draworbits,params,varargin);
 
 %
 %makes contour plot of FS in plane perp. to normal at a point kpara along
 %the direction of normal
-
+a = 1
+b = 2
 normal=normal/norm(normal);
 
 if isempty(params)
@@ -96,7 +97,7 @@ kp=normal*kpara;
 %draw bndry of volume included in sliceFS i.e. bandsdata.searchvol
 bplanes=bandsdata.searchvol;
 [bkps bnrms]=normdir(bplanes);
-plist=boundingpoly(kpara,normal,bbplanes,[0 0 0]);
+plist=boundingpoly(kpara,normal,bkps,bnrms,[0 0 0]);
 %express vertices of bounding polygon in in-plane coords rel. to point kp
 for pnum=1:size(plist,1)
     planeplist(pnum,1)=dot(plist(pnum,:)-kp,inplanedirns{1});
@@ -108,7 +109,8 @@ xlims=xlim;
 
 %draw BZ boundary in plane
 bplanes=bandsdata.BZfacenormals(:,:)*bandsdata.rec_latt_vecs;
-plist=boundingpoly(kpara,normal,bplanes,[0 0 0]);
+[bkps bnrms]=normdir(bplanes);
+plist=boundingpoly(kpara,normal,bkps,bnrms,[0 0 0]);
 
 %draw 3d BZ (need to calc in-plane coords of patch vertices)
 bplane_normals=bandsdata.BZfacenormals*bandsdata.rec_latt_vecs;

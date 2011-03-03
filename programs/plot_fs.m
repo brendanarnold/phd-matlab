@@ -151,13 +151,16 @@ for bandnum=1:numbands
     end
     daspect(haxes,[1 1 1]);
     opengl software;
-    %material shiny;
+    material shiny;
     %create light on right of initial view
+    
     lights=findobj(gca,'Type','Light');
     delete(lights);
     light('Position',[1 0 0],'Style','infinite');
     light('Position',[-1 0 0],'Style','infinite');
-    %set lighting algorithm
+    
+    % set lighting algorithm
+    
     lighting gouraud;    
     hFSpatches(bandnum)=p;
     %alpha(p,0.9);

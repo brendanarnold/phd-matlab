@@ -4,7 +4,6 @@ function plot_FSslice3(haxes,normal,kpara,vol,bandsdata,FermiLevelShift,bandnums
 %
 %makes contour plot of FS in plane perp. to normal at a point kpara along
 %the direction of normal
-
 normal=normal/norm(normal);
 
 if isempty(params)
