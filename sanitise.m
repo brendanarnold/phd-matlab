@@ -4,7 +4,7 @@
 
 % Reset the workspace variables
 clear all;
-clf;
+%clf;
 % Reset open figure backgrounds
-whitebg('white');
-colordef white;
+%whitebg('white');
+%colordef white;

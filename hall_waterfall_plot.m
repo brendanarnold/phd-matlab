@@ -2,6 +2,10 @@ function hall_waterfall_plot(y_col)
     % Generate a 2D waterfall plot from an automatically generated
     % configuration file.
 
+    % Requires:
+    %   @MiscFns (Brendan Arnold)
+    
+    
 %     config_filename = 'waterfall_config.txt';
 %     input_extension = '.*_(.*)-.*_spliced\.dat\.avg$';
     input_extension = '.*_(.*)\.hall$';
