@@ -55,7 +55,7 @@ else
     %kpara values have been provided in input arguments
     kdiff_threshold=min(diff(kparas))*5;
 end
-    
+   
 fdiff_threshold=0.3;
     
 %getinplanedirn finds dirn in plane perp to normal and passing through
@@ -79,10 +79,13 @@ for bandnum=1:length(bandnums)
     %discard orbits with f outside limits
     allorbits{bandnum}=allorbits{bandnum}(allorbits{bandnum}(:,2)>=params.minfreq,:);
 
-    
+
     if ~isempty(allorbits{bandnum})
         %identify orbits as fn of kpara 
-        branchnumbers=grouporbits(allorbits{bandnum},kparas,6,2,fdiff_threshold,3,kdiff_threshold,1);
+        % FIXME: Seems to be a problem with the branch identification, just
+        % allocate 1 to all branches
+%         branchnumbers=grouporbits(allorbits{bandnum},kparas,6,2,fdiff_threshold,3,kdiff_threshold,1);
+        branchnumbers = ones(size(allorbits{bandnum}, 1), 1);
         for branchnum=1:max(branchnumbers)
             branches{bandnum}{branchnum}(:,:)=allorbits{bandnum}(branchnumbers==branchnum,:);
             branches{bandnum}{branchnum}=[branches{bandnum}{branchnum} repmat(dk,[size(branches{bandnum}{branchnum},1) 1])];

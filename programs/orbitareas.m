@@ -15,7 +15,8 @@ if plotslice
     figure('Name',['Kpara=' num2str(slice.kpara)]);
     tE=slice.E{1};
     tE(slice.outsidebounds)=nan;
-    contour(tE');
+    contour(tE', [E E]);
+%     contour(tE');
 end
 vertices_results=[];
 

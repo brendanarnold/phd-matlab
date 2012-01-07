@@ -1,2 +1,4 @@
 glob:*.svn/*
 glob:*.swp
+syntax: glob
+*.asv
