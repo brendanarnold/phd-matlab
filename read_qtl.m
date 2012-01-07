@@ -1,23 +1,29 @@
-function read_qtl(pathcasename, w2k_band_nums, atom_ind, char_inds)
-% read_qtl(pathcasename)
+function read_qtl(pathcasename, w2k_band_nums, atom_ind, char_inds, ef)
+% read_qtl(pathcasename, w2k_band_nums, atom_ind, char_inds, ef)
 %
 % Reads .qtl and .energy files into a series of ascii files named pathcasename.band_N
 % where N is the band number (not the WIEN2k band number)
 %
 % Emulates Tony's Delphi program 'BandCharPlotter_v4'
 %
-% Format for the files is tab separated with no headers. Each column is as
-% follows,
+% Format for the files from Tony's program is tab separated with no
+% headers with each column as follows,
 % kx, ky, kz, Energy, Total D, Dz2, Dxy, Dx2y2, Dxz+Dyz
+% To get this, look at the first line of .qtl and choose the indexes for
+% char_inds that correspond to the above (typically [11 7 8 9 10])
 %
 % pathcasename:    The filepath stem inclusing casename i.e. 'BaFe2P2_1e5/BaFe2P2' 
 % w2k_band_nums:   The WIEN2k band numbers that you want to extract (n.b.
 %                  will be renumbered to 1..n). If left empty, bands
 %                  crossing Fermi energy will be used.
-% atom_ind:        The atom number as defined in case.struct
+% atom_ind:        The atom number (as defined in case.struct, remove
+%                  negative sign)
 % char_inds:       The orbital characters to include in the files. Indexes
 %                  are as laid out int the .qtl file header for a
-%                  particular atom
+%                  particular atom. Leave as [] to include all orbital
+%                  characters.
+% ef:              Fermi energy. If left empty, will use the Fermi energy
+%                  from .qtl file (not usually a good idea!)
 
 qtl_fn = [pathcasename '.qtl'];
 disp(['QTL input file: ' qtl_fn]);
@@ -40,8 +46,12 @@ if isempty(w2k_band_nums)
     for dummy = 1:3
         line = fgetl(qtl_fh);
     end
-    ef = str2double(line(57:66));
-    disp(sprintf('  Fermi energy from QTL file: %fRy', ef));
+    if isempty(ef)
+        ef = str2double(line(57:66));
+        disp(sprintf('  Fermi energy from QTL file: %fRy', ef));
+    else
+        disp(sprintf('  Fermi energy specified as: %fRy', ef));
+    end
     % Skip to first band
     while ~strcmp(line(1:6), ' BAND:')
         line = fgetl(qtl_fh);
@@ -170,7 +180,7 @@ for band_num = 1:length(w2k_band_nums)
         char_data = qtl_data{band_num}(:, char_inds);
     end
     out_data = [energy_data(:,1:3) energy_data(:,3+band_num) char_data];
-    out_fn = [pathcasename '.band_' num2str(band_num)];
+    out_fn = [pathcasename '.band' num2str(band_num) '_atom' num2str(atom_ind)];
     save(out_fn, 'out_data', '-ascii', '-tabs');
     disp(['Written to: ' out_fn]);
 end
