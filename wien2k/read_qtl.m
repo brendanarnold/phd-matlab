@@ -4,6 +4,9 @@ function read_qtl(pathcasename, w2k_band_nums, atom_ind, char_inds, ef)
 % Reads .qtl and .energy files into a series of ascii files named pathcasename.band_N
 % where N is the band number (not the WIEN2k band number)
 %
+% Also write a duplicate file to pathcasename.band_N_atom_M since cannot
+% tell from file alone what atom is being examined
+%
 % Emulates Tony's Delphi program 'BandCharPlotter_v4'
 %
 % Format for the files from Tony's program is tab separated with no
@@ -102,6 +105,7 @@ else
     disp(char_inds);
 end
 % Now read in the character data for each band
+disp('Reading QTL file ...');
 qtl_data = {};
 for w2k_band_num = w2k_band_nums
     % Fast forward to the first band in the list
@@ -180,9 +184,12 @@ for band_num = 1:length(w2k_band_nums)
         char_data = qtl_data{band_num}(:, char_inds);
     end
     out_data = [energy_data(:,1:3) energy_data(:,3+band_num) char_data];
-    out_fn = [pathcasename '.band' num2str(band_num) '_atom' num2str(atom_ind)];
+    out_fn = [pathcasename '.band_' num2str(band_num)];
     save(out_fn, 'out_data', '-ascii', '-tabs');
     disp(['Written to: ' out_fn]);
+    out_fn = [pathcasename '.band' num2str(band_num)  '_atom' num2str(atom_ind)];
+    save(out_fn, 'out_data', '-ascii', '-tabs');
+    disp(['Also written to: ' out_fn]);
 end
 
 disp('read_qtl done.');
