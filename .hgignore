@@ -1,1 +1,4 @@
-glob:*.asv
+glob:*.svn/*
+glob:*.swp
+syntax: glob
+*.asv

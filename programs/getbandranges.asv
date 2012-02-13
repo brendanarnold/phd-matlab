@@ -1,0 +1,31 @@
+function bandranges=getbandranges(casename,dirnstr);
+
+infile=fopen([casename '.output2' dirnstr],'r');
+if infile==-1
+    disp('case.output2 file not found');
+    bandranges=[];
+    return;
+end
+
+notatend=true; inbandranges=false;
+while notatend
+    linestr=fgetl(infile);
+    if ~inbandranges & linestr==-1
+        bandranges=0;
+        notatend=false;       
+    elseif inbandranges & (length(linestr)<5 | ~strcmp(linestr(2:5),'band'))
+        notatend=false;
+    elseif inbandranges & length(linestr)>5 & strcmp(linestr(2:5),'band')
+        [namestr bandnum emin emax occ]=textscan(linestr,'%s%f%f%f%f');
+        bandnum=str2num(linestr(15:17));
+        emin=str2num(linestr(19:42));
+        emax=str2num(linestr(43:end));
+        bandranges(bandnum,:)=[emin emax];
+    elseif ~inbandranges & length(linestr)>11 & ~isempty(strfind(linestr,'Bandranges'))
+        inbandranges=true;
+    end
+end
+fclose(infile);
+    
+
+

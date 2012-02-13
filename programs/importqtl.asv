@@ -1,0 +1,84 @@
+function [pcharges coltitles]=importQTL(infilename,bandnums,numkpoints);
+%function energy=importenergy(infilename);
+%
+%reads Wien2k case.energy(up/dn) file and returns result in a 2d array
+%energy(bandnum,kpointnum)
+infile=fopen(infilename,'r');
+if infile==-1
+    disp('case.qtl file not found');
+    pcharges=[];
+    return;
+end
+disp(['Importing partial charges from ' infilename '. Bands ' num2str(bandnums) '. Expecting ' num2str(numkpoints) ' kpoints.']);
+
+%skip header lines
+stillinheader=true; linenum=0;
+while stillinheader
+        linestr=fgetl(infile);
+        linenum=linenum+1;
+        %test whether line is index line for first kpoint        
+        if length(linestr)>=9 & strcmp(linestr(1:9),' JATOM  1');
+            stillinheader=false;
+        end        
+end
+
+%read partial chg titles for each atom
+notatend=true; atomnum=1;
+while notatend
+    titles{atomnum}=delimstr2cell(linestr(32:end),',');
+    linestr=fgetl(infile);
+    linenum=linenum+1;
+    if ~strcmp(linestr(1:6),' JATOM')
+        notatend=false;
+    else
+        atomnum=atomnum+1;
+        datastart=ftell(infile);
+    end
+end
+coltitles=cat(2,titles{:});
+numatoms=atomnum;
+for atomnum=1:numatoms
+    numcols(atomnum)=length(titles{atomnum});
+end
+numcols(atomnum+1)=1;
+abscols=[[1 cumsum(numcols(1:numatoms+1-1))+1]; cumsum(numcols)];
+
+[FL,p]=grep2('-s','BAND',infilename);
+byteoffs=p.byteoffs; clear p,FL;
+bytesperk=sum(24+(numcols-1)*8)-3+(numatoms+1);
+bytesperband=bytesperk*numkpoints+10+1;
+
+%check file length is as expected and calc num bands in file
+filedetails=dir(infilename);
+numbandsinfile=(filedetails.bytes-datastart)/bytesperband;
+disp(['QTL file contains ' num2str(numbandsinfile) ' bands.']);
+if numbandsinfile~=round(numbandsinfile)
+    disp('   i.e. file is not expected length');
+    numbandsinfile=round(numbandinfile);
+end
+bandoffset=datastart+(0:numbandsinfile-1)*bytesperband;
+if isempty(bandnums)
+    bandnums=1:numbandsinfile;
+end
+
+if ~strcmp(linestr,' BAND:   1')
+    disp('Unexpected format in QTL file');
+    return;
+end
+
+%get data from bands in bandnums
+for bandnum=1:length(bandnums)
+    fseek(infile,bandoffset(bandnums(bandnum)),'bof');
+    linestr=fgetl(infile);
+    if ~strcmp(linestr(1:5),' BAND')
+        disp('Unexpected format in QTL file');
+        return;
+    end
+    for knum=1:numkpoints
+    for atomnum=1:numatoms+1
+        linestr=fgetl(infile);
+        dataline{atomnum}=delimstr2cell(linestr,' ');
+        pcharges(bandnum,knum,abscols(1,atomnum):abscols(2,atomnum))=str2num(cell2mat(dataline{atomnum}(3:end)'));
+    end    
+    end   
+end

@@ -1,0 +1,8 @@
+function horbpoints=plotrotplot(rplotdata,selorbitnums,dMdB,B,params);
+   
+if any(dMdB>0)
+    BPcorr=[rplotdata.freq]-B*dMdB*[rplotdata.dFdM];
+horbpoints=plot([rplotdata.angle]',[rplotdata.freq]/1e3',params.LineSpec,'MarkerSize',params.MarkerSize,'MarkerEdgeColor',params.MarkerEdgeColor);
+hselorbpoints=plot([rplotdata(selorbitnums).angle]',[rplotdata(selorbitnums).freq]/1e3',params.LineSpec,'MarkerSize',1.5*params.MarkerSize,'MarkerEdgeColor',params.MarkerEdgeColor);
+set(horbpoints,'ButtonDownFcn','dHvA_GUI(''Axes_Rotplot_ButtonDown_Callback'',gcbo,[],guidata(gcbo))');
+set(hselorbpoints,'ButtonDownFcn','dHvA_GUI(''Axes_Rotplot_ButtonDown_Callback'',gcbo,[],guidata(gcbo))');

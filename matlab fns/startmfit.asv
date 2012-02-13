@@ -1,0 +1,100 @@
+function startmfit;
+
+inputpath='c:\work\ZrZn2\YellowMag\fieldmod\Au_calib\rawdata\';
+set(findobj('Tag','mf_DataDir'),'string',inputpath);
+
+filename={'ey280505e'};
+
+initialpars=[...
+    0.0146 ...
+    3.0782e-5 ...
+    -4.483e-4 ...
+    1.5611e3 ...
+    -19.6633 ...
+    -0.0048 ...
+    7.8114e-4 -6.8343e-6 -0.0131 -0.0682 2.5066e-4]
+initialpars=[ ...
+    0.65e-3    ...%amp1
+    1.73e-4    ...%amp1_
+    0.4e-3     ...%amp1__
+    1533.1    ...%freqmean
+    182.8      ...%freqdiff
+    2.6       ...%phasemean
+    0.63e-3    ...%amp2
+    1.73e-4    ...%amp2_
+    0.4e-3       ...%amp2__
+    -1       ...%phasediff
+    4.95e-3    ...%backgd
+    0.27e-3    ...%backgd_
+    0.5e-3    ...%backgd__
+    -0.009  ...%field shift
+    ];
+
+Bstart=8.7; Bend=9.3;
+
+mf_batch('FitFuncFile LKOct06deltaofT4');
+for filenum=1:length(filenames);
+    argstr=['load ' filenames{filenum} '.dat'];
+    mf_batch(argstr);
+
+    for parnum=1:length(initialpars)
+    mf_batch(['par ' num2str(parnum) ' ' num2str(initialpars(parnum))]);
+    end
+
+    
+    mf_batch('par 14 3');
+    opt_backgd;
+    for n=1:3
+        opt_backgd;        
+        opt_T;
+    end
+    for n=1:3
+        opt_phases;
+        opt_backgd;
+        opt_T;
+    end
+    opt_phases;
+    
+    [fitvals fiterrs]=mf_rpars;
+    results.fitvals(filenum,1:length(initialpars))=fitvals;
+    results.fiterrs(filenum,1:length(initialpars))=fiterrs;
+    [results.stats.r2(filenum) results.stats.rv(filenum) results.stats.chisqd(filenum,:)]=mf_stats;
+end
+
+results.filenames=filenames;
+save results;
+saveresultstofile(results);
+
+end
+
+function opt_T;
+    mf_batch('fix all');
+    mf_batch('free 5,14');
+    mf_batch('fit');
+end
+function opt_backgd;
+    mf_batch('fix all');    
+    mf_batch('free 9,10');
+    mf_batch('fit');
+end
+function opt_phases;
+    mf_batch('fix all');
+    mf_batch('free 4,8');
+    mf_batch('fit');
+end
+
+function saveresultstofile(results);
+outfile=fopen('c:\work\ZrZn2\yellowmag\fieldmod\phaseres1_8p7to9p3_downsweeps_101006.txt','w');
+fprintf(outfile,'filename,T(K),phase1,err(phase1),phase2,err(phase2),chisqd,delta(phase1-phase2),err(delta phase)\r\n');
+results.deltadeltaphase=(results.fitvals(:,4)-results.fitvals(:,8));
+results.deltadeltaphase=results.deltadeltaphase(:)-results.deltadeltaphase(1);
+results.errddphase=sqrt(results.fiterrs(:,4).^2+results.fiterrs(:,8).^2);
+for n=1:length(results.stats.r2)
+    
+    
+    fprintf(outfile,'%s,%f,%f,%f,%f,%f,%f,%f,%f\r\n',results.filenames{n},abs(results.fitvals(n,14)),results.fitvals(n,4),results.fiterrs(n,4),...
+        results.fitvals(n,8),results.fiterrs(n,8),results.stats.chisqd(n,1),results.deltadeltaphase(n),...
+        results.errddphase(n));    
+end
+fclose(outfile);
+end

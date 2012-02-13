@@ -1,0 +1,105 @@
+function [masses,dfdMs,vertices]=calcmasses(orbitdata,bandsdata,deltaE,deltaM_bandsdata,deltaM);
+%function [masses,dfdMs,vertices]=calcmasses(orbitdata,bandsdata,deltaE,deltaM_bandsdata,deltaM);
+%
+%gets info for each extremal orbit: vertices, cyclotron masses and, if 'deltaM_bandsdata'
+%is not empty, also calculates df/dM for back projection
+%requires orbitdata with columns: bandnum, Bdirn, kcentre(x,y,z), kpara, frequency
+
+Ryd2Joules=13.6*1.6e-19;
+
+kpara_col=14;
+kcentre_col=11;
+Bdirn_col=2;
+bandnum_col=5;
+freq_col=10;
+dk_col=16;
+
+%max permissible change in kcentre of orbit as E_F -> E_F+deltaE
+%(~data spacing)
+kdiff_threshold=sqrt(bandsdata.dx^2+bandsdata.dy^2+bandsdata.dz^2);
+fdiff_threshold=10000;
+
+masses=zeros(size(orbitdata,1),1);
+dfdMs=zeros(size(orbitdata,1),1);
+vertices=[];
+%recalculate F at E_F+deltaE to get mass of each extremal orbit
+for orbitnum=1:size(orbitdata,1)
+    %get orbit-specific qties
+    orbitFermiLevel=bandsdata.FermiLevel(bandsdata.spindirns(orbitdata(orbitnum,bandnum_col)));
+    kpara=orbitdata(orbitnum,kpara_col);
+    freq=orbitdata(orbitnum,freq_col);
+    Bdirn=orbitdata(orbitnum,Bdirn_col+(0:2));
+    inplanedirns=getinplanedirn(Bdirn,bandsdata);
+    slice=sliceFS(Bdirn,inplanedirns,kpara,orbitdata(orbitnum,dk_col),bandsdata,orbitdata(orbitnum,bandnum_col));
+    
+    %get contour vertices of all extremal orbits
+    [coplanar_orbits coplanar_vertices]=orbitareas(slice,bandsdata,orbitFermiLevel,false,true);
+    groupfninput=[0 orbitdata(orbitnum,[freq_col kcentre_col+(0:2)]) orbitFermiLevel 0; ...
+        coplanar_orbits{1} ones(size(coplanar_orbits{1},1),1)*[orbitFermiLevel+deltaE 1]];
+    branchnumbers=grouporbits_test(groupfninput,[0 1],size(groupfninput,2),2,fdiff_threshold,3,kdiff_threshold,3);
+    matching_index=find(branchnumbers==1); matching_index=matching_index(2:end);    
+    if length(matching_index)==1
+        %store for output after having converted vertices to absolute k coords
+        numverts=length(coplanar_vertices{1}{matching_index-1}.x);
+        vertices{orbitnum,1}=[interp2(permute(slice.X,[2 1]),coplanar_vertices{1}{matching_index-1}.x',coplanar_vertices{1}{matching_index-1}.y') ...
+            interp2(permute(slice.Y,[2 1]),coplanar_vertices{1}{matching_index-1}.x',coplanar_vertices{1}{matching_index-1}.y') ...
+            interp2(permute(slice.Z,[2 1]),coplanar_vertices{1}{matching_index-1}.x',coplanar_vertices{1}{matching_index-1}.y')];
+    elseif length(matching_index)>1
+        %indicate didn't find unambiguous matching orbit
+        vertices{orbitnum,1}='>1 orbits match';
+    else 
+        vertices{orbitnum,1}='no orbits match';
+    end
+    
+
+
+    %find all orbits on same plane as current orbit at E_f+deltaE
+    coplanar_orbits=orbitareas(slice,bandsdata,orbitFermiLevel+deltaE,false,false);
+    %find orbit corresponding to current orbit
+    %last column of groupfninput tells group orbits that one of orbits 2 to
+    %n is to be matched to orbit 1
+    groupfninput=[0 orbitdata(orbitnum,[freq_col kcentre_col+(0:2)]) orbitFermiLevel 0; ...
+        coplanar_orbits{1} ones(size(coplanar_orbits{1},1),1)*[orbitFermiLevel+deltaE 1]];
+    branchnumbers=grouporbits_test(groupfninput,[0 1],size(groupfninput,2),2,fdiff_threshold,3,kdiff_threshold,3);
+    %first element of branchnumbers corresponds to current orbit, so
+    %interested in next occurrence(s) of branchnumber=1
+    matching_index=find(branchnumbers==1); matching_index=matching_index(2:end);    
+    if length(matching_index)==1
+        masses(orbitnum)=1.6e-19*((6.626e-34)/2/pi)/(9.1e-31)*(coplanar_orbits{1}(matching_index-1,2)-freq)/(deltaE*Ryd2Joules);
+    else
+        %indicate didn't find unambiguous matching orbit at E_F+deltaE
+        if length(matching_index)==0
+            masses(orbitnum)=999;
+        else
+            masses(orbitnum)=9999;
+        end
+    end
+
+    if ~isempty(deltaM_bandsdata)
+        %now get dfdM (find corresponding orbits in corresponding
+        %slices of deltaM_bandsdata which is calculated at FSM_deltaM)
+        deltaM_FermiLevel=deltaM_bandsdata.FermiLevel(bandsdata.spindirns(orbitdata(orbitnum,bandnum_col)));
+        slice=sliceFS(Bdirn,inplanedirns,kpara,orbitdata(orbitnum,dk_col),deltaM_bandsdata,orbitdata(orbitnum,bandnum_col));
+        coplanar_orbits=orbitareas(slice,deltaM_bandsdata,deltaM_FermiLevel,false,false);
+        %find orbit corresponding to current orbit
+        %last column of groupfninput tells group orbits that one of orbits 2 to
+        %n is to be matched to orbit 1
+        groupfninput=[0 orbitdata(orbitnum,[freq_col kcentre_col+(0:2)]) orbitFermiLevel 0; ...
+            coplanar_orbits{1} ones(size(coplanar_orbits{1},1),1)*[deltaM_FermiLevel 1]];        
+        branchnumbers=grouporbits_test(groupfninput,[0 1],size(groupfninput,2),2,fdiff_threshold,3,kdiff_threshold,3);
+        %first element of branchnumbers corresponds to current orbit, so
+        %interested in next occurrence(s) of branchnumber=1
+        matching_index=find(branchnumbers==1); matching_index=matching_index(2:end);    
+        if length(matching_index)==1
+            dfdMs(orbitnum)=(coplanar_orbits{1}(matching_index-1,2)-freq)/deltaM;
+        else
+            %indicate didn't find unambiguous matching orbit in
+            %deltaM_bandsdata
+            if length(matching_index)==0
+                dfdMs(orbitnum)=99999;
+            else
+                dfdMs(orbitnum)=999999;
+            end
+        end
+    end
+end
